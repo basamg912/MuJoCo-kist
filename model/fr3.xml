@@ -1,7 +1,7 @@
 <mujoco model="panda">
   <compiler angle="radian" meshdir="assets" autolimits="true" />
 
-  <option integrator="implicit" timestep="0.003" collision="predefined"/>
+  <option integrator="implicit" timestep="0.003"/>
   <!-- <option timestep="0.003" tolerance="1e-06" collision="predefined" cone="elliptic" jacobian="sparse" solver="CG" iterations="30" /> -->
 
   <default>

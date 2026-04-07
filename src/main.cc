@@ -239,7 +239,7 @@ mjModel* LoadModel(const char* file, mj::Simulate& sim) {
     }
   }
 
-  mju::strcpy_arr(sim.loadError, loadError);
+  mju::strcpy_arr(sim.load_error, loadError);
 
   if (!mnew) {
     std::printf("%s\n", loadError);
@@ -272,7 +272,7 @@ void PhysicsLoop(mj::Simulate& sim) {
       mjData* dnew = nullptr;
       if (mnew) dnew = mj_makeData(mnew);
       if (dnew) {
-        sim.load(sim.dropfilename, mnew, dnew);
+        sim.Load(mnew, dnew, sim.dropfilename);
 
         mj_deleteData(d);
         mj_deleteModel(m);
@@ -294,7 +294,7 @@ void PhysicsLoop(mj::Simulate& sim) {
       mjData* dnew = nullptr;
       if (mnew) dnew = mj_makeData(mnew);
       if (dnew) {
-        sim.load(sim.filename, mnew, dnew);
+        sim.Load(mnew, dnew, sim.dropfilename);
 
         mj_deleteData(d);
         mj_deleteModel(m);
@@ -320,7 +320,7 @@ void PhysicsLoop(mj::Simulate& sim) {
 
     {
       // lock the sim mutex
-      const std::lock_guard<std::mutex> lock(sim.mtx);
+      const std::lock_guard<mj::SimulateMutex> lock(sim.mtx);
 
       // run only if model is present
       if (m) {
@@ -352,10 +352,10 @@ void PhysicsLoop(mj::Simulate& sim) {
           double elapsedSim = d->time - syncSim;
 
           // inject noise
-          if (sim.ctrlnoisestd) {
+          if (sim.ctrl_noise_std) {
             // convert rate and scale to discrete time (Ornstein–Uhlenbeck)
-            mjtNum rate = mju_exp(-m->opt.timestep / mju_max(sim.ctrlnoiserate, mjMINVAL));
-            mjtNum scale = sim.ctrlnoisestd * mju_sqrt(1-rate*rate);
+            mjtNum rate = mju_exp(-m->opt.timestep / mju_max(sim.ctrl_noise_std, mjMINVAL));
+            mjtNum scale = sim.ctrl_noise_std * mju_sqrt(1-rate*rate);
 
             for (int i=0; i<m->nu; i++) {
               // update noise
@@ -367,7 +367,7 @@ void PhysicsLoop(mj::Simulate& sim) {
           }
 
           // requested slow-down factor
-          double slowdown = 100 / sim.percentRealTime[sim.realTimeIndex];
+          double slowdown = 100 / sim.percentRealTime[sim.real_time_index];
 
           // misalignment condition: distance from target sim time is bigger than syncmisalign
           bool misaligned =
@@ -379,12 +379,12 @@ void PhysicsLoop(mj::Simulate& sim) {
             // re-sync
             syncCPU = startCPU;
             syncSim = d->time;
-            sim.speedChanged = false;
+            sim.speed_changed = false;
 
-            // clear old perturbations, apply new
-            mju_zero(d->xfrc_applied, 6*m->nbody);
-            sim.applyposepertubations(0);  // move mocap bodies only
-            sim.applyforceperturbations();
+            // // clear old perturbations, apply new
+            // mju_zero(d->xfrc_applied, 6*m->nbody);
+            // sim.applyposeperturbations(0);  // move mocap bodies only
+            // sim.applyforceperturbations();
 
             // run single step, let next iteration deal with timing
             mj_step(m, d);
@@ -425,8 +425,8 @@ void PhysicsLoop(mj::Simulate& sim) {
 
         // paused
         else {
-          // apply pose perturbation
-          sim.applyposepertubations(1);  // move mocap and dynamic bodies
+          // // apply pose perturbation
+          // sim.applyposepertubations(1);  // move mocap and dynamic bodies
 
           // run mj_forward, to update rendering and joint sliders
           mj_forward(m, d);
@@ -445,7 +445,7 @@ void PhysicsThread(mj::Simulate* sim, const char* filename) {
     m = LoadModel(filename, *sim);
     if (m) d = mj_makeData(m);
     if (d) {
-      sim->load(filename, m, d);
+      sim->Load(m, d, filename);
       mj_forward(m, d);
 
       // allocate ctrlnoise
@@ -496,9 +496,18 @@ int main(int argc, const char** argv) {
   // scan for libraries in the plugin directory to load additional plugins
   scanPluginLibraries();
 
+  mjvCamera cam;
+  mjv_defaultCamera(&cam);
+
+  mjvOption opt;
+  mjv_defaultOption(&opt);
+
+  mjvPerturb pert;
+  mjv_defaultPerturb(&pert);
+
   // simulate object encapsulates the UI
   auto sim = std::make_unique<mj::Simulate>(
-      std::make_unique<mj::GlfwAdapter>());
+      std::make_unique<mj::GlfwAdapter>(), &cam, &opt, &pert, /* is_passive =*/ false);
 
   const char* filename = nullptr;
   
@@ -511,7 +520,7 @@ int main(int argc, const char** argv) {
   std::thread physicsthreadhandle(&PhysicsThread, sim.get(), filename);
 
   // start simulation UI loop (blocking call)
-  sim->renderloop();
+  sim->RenderLoop();
   physicsthreadhandle.join();
 
   return 0;

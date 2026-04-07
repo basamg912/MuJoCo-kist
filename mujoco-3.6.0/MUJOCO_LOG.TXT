@@ -1,0 +1,32 @@
+Tue Apr  7 09:39:02 2026
+ERROR: Load model error: ParseXML: Error opening file '--help'
+
+Tue Apr  7 09:43:23 2026
+ERROR: Load model error: Error: Error opening file '../../kapex0_description/LL1.STL'
+
+Tue Apr  7 09:44:17 2026
+ERROR: Load model error: ParseXML: Error opening file 'model/kapex_converted.xml'
+
+Tue Apr  7 09:44:26 2026
+ERROR: Load model error: Error: no decoder found for mesh file 'model/kapex/kapex0_description/LL2.STL'
+Element name 'LL2', id 2, line 9
+
+Tue Apr  7 09:46:16 2026
+ERROR: Load model error: Error: Error opening file 'base_link.STL'
+
+Tue Apr  7 09:46:29 2026
+ERROR: Load model error: Error: no decoder found for mesh file 'model/kapex/kapex0_description/LL4.STL'
+Element name 'LL4', id 4
+
+Tue Apr  7 09:47:21 2026
+ERROR: Load model error: Error: no decoder found for mesh file 'model/kapex/kapex0_description/base_link.STL'
+Element name 'base_link', id 0
+
+Tue Apr  7 09:48:58 2026
+ERROR: Load model error: Error: no decoder found for mesh file 'model/kapex/kapex0_description/LL2.STL'
+Element name 'LL2', id 2, line 7
+
+Tue Apr  7 09:49:42 2026
+ERROR: Load model error: Error: no decoder found for mesh file 'model/kapex/kapex0_description/LL1.STL'
+Element name 'LL1', id 1, line 6
+

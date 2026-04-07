@@ -18,9 +18,9 @@ message(STATUS "current : " ${CMAKE_CURRENT_SOURCE_DIR})
 add_definitions(-DMJSIMULATE_STATIC) # use static =,solve the "error LNK2001/LNK2019" in windows
 
 find_package (X11)
-find_library(GLFW libglfw.so.3 HINTS ${CMAKE_SOURCE_DIR}/mujoco200/bin)
+find_library(GLFW libglfw.so.3 HINTS ${CMAKE_SOURCE_DIR}/mujoco-3.6.0/bin)
 # set MUJOCO root
-set(MUJOCO_HOME ${CMAKE_SOURCE_DIR}/mujoco-2.3.3/)
+set(MUJOCO_HOME ${CMAKE_SOURCE_DIR}/mujoco-3.6.0/)
 message(STATUS "MUJOCO_HOME: " ${MUJOCO_HOME})
 
 
@@ -37,8 +37,8 @@ link_directories(
 
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/mujoco-2.3.3/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/mujoco-2.3.3/simulate
+    ${CMAKE_CURRENT_SOURCE_DIR}/mujoco-3.6.0/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/mujoco-3.6.0/simulate
   $ENV{EIGEN3_INCLUDE_DIR}/Eigen/
   ${GLEW_INCLUDE_DIRS}
     /usr/local/include/rbdl
@@ -60,7 +60,7 @@ set(COM_SRC
 
 set(COM_LIB 
 ${MUJOCO_HOME}/lib/libmujoco.so
-${MUJOCO_HOME}/lib/libmujoco.so.2.3.3
+${MUJOCO_HOME}/lib/libmujoco.so.3.6.0
 ${MUJOCO_HOME}/bin/mujoco_plugin/libelasticity.so
 ${GLFW}
 )
@@ -78,4 +78,10 @@ target_link_libraries(run
 	GLEW::GLEW
 	${GLEW_LIBRARIES}
 	${OPENGL_LIBRARIES}
+)
+
+add_custom_command(TARGET run POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E create_symlink
+    ${MUJOCO_HOME}/bin/mujoco_plugin
+    $<TARGET_FILE_DIR:run>/mujoco_plugin
 )
