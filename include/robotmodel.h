@@ -4,9 +4,11 @@
 
 #include <iostream>
 #include <eigen3/Eigen/Dense>
-#include <rbdl/rbdl.h>
-#include <rbdl/addons/urdfreader/urdfreader.h>
-#include "custommath.h"
+// ! 4/7 추가 RBDL -> Mujoco 
+#include <mujoco/mujoco.h>
+// #include <rbdl/rbdl.h>
+// #include <rbdl/addons/urdfreader/urdfreader.h>
+#include "custommath.h"\
 
 
 using namespace std;
@@ -16,10 +18,14 @@ class CModel
 {
 public:
 	CModel();
-	virtual ~CModel();
+    // 가상 함수 테이블 확인 후 상속하는 클래스 소멸자도 모두 실행, (최하위 -> 최상위), 
+    // 문제상황 CModel 타입 포인터로 CModel 을 상속하는 자식 클래스를 접근
+    // CModel* model = new ChildModel(); -> delete model; -> CModel 소멸자 실행 -> ChildModel 소멸자 실행 X
+    // -> 자식 클래스에서 할당한 메모리 해제 X -> 메모리 누수 발생 => 최상위 부모 클래스에서 소멸자 virtual 선언
+	virtual ~CModel(); 
 
-    RigidBodyDynamics::Model _model;
-
+    // RigidBodyDynamics::Model _model;
+    void set_mujoco_model(const mjModel* m, mjData* d);
     void update_kinematics(VectorXd & q, VectorXd & qdot); // update robot state
     void update_dynamics(); // calculate _A, _g, _b, _bg
     void calculate_EE_Jacobians(); // calcule jacobian
@@ -45,7 +51,8 @@ public:
 
 private:
 	void Initialize();
-	void load_model(); // read URDF model
+    // ! 4/7 RBDL -> Mujoco 
+	// void load_model(); // read URDF model
 	void set_robot_config();
 
     VectorXd _q, _qdot; // joint sensordata
@@ -54,6 +61,9 @@ private:
     int _k; // joint number
     int _id_hand; // hand id
 
+    // ! 4/7 RBDL -> Mujoco
+    const mjModel* _mj_model;
+    mjData* _mj_data;
     bool _bool_model_update, _bool_kinematics_update, _bool_dynamics_update, _bool_Jacobian_update; // update check
 
 };

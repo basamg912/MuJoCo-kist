@@ -49,25 +49,34 @@ void CModel::Initialize()
     _xdot_hand.setZero(6);
 
 	set_robot_config();
-    load_model();
+	// ! 4/7 RBDL -> Mujoco
+    // load_model();
+	_mj_model = nullptr;
+	_mj_data = nullptr;
 }
 
+// ! 4/7 RBDL -> Mujoco
+// void CModel::load_model()
+// {   
+//     // RigidBodyDynamics::Addons::URDFReadFromFile("../model/panda_arm_hand.urdf", &_model, false, true);
+// 	RigidBodyDynamics::Addons::URDFReadFromFile("../model/kapex/KAPEX_wo_hand_head.urdf", &_model, false, false);
 
-void CModel::load_model()
-{   
-    // RigidBodyDynamics::Addons::URDFReadFromFile("../model/panda_arm_hand.urdf", &_model, false, true);
-	RigidBodyDynamics::Addons::URDFReadFromFile("../model/fr3.urdf", &_model, false, false);
+//     cout << endl << endl << "Model Loaded for RBDL." << endl << "Total DoFs: " << _model.dof_count << endl << endl;
+// 	if (_model.dof_count != _k)
+// 	{
+// 		cout << "Simulation model and RBDL model mismatch!!!" << endl << endl;
+// 	}
 
-    cout << endl << endl << "Model Loaded for RBDL." << endl << "Total DoFs: " << _model.dof_count << endl << endl;
-	if (_model.dof_count != _k)
-	{
-		cout << "Simulation model and RBDL model mismatch!!!" << endl << endl;
-	}
+//     _bool_model_update = true; //check model update
 
-    _bool_model_update = true; //check model update
+// 	cout << "Model Loading Complete." << endl << endl;
 
-	cout << "Model Loading Complete." << endl << endl;
+// }
 
+void CModel::set_mujoco_model(const mjModel* m, mjData* d){
+	_mj_model = m;
+	_mj_data = d;
+	_bool_model_update = true;
 }
 
 void CModel::update_kinematics(VectorXd & q, VectorXd & qdot)
