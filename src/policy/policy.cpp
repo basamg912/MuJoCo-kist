@@ -51,6 +51,7 @@ Eigen::VectorXd Policy::inference(const Eigen::VectorXd& obs){
     const char* output_name[] = {_output_name.c_str()};
 
     // ? input, output 이 1개씩 
+    // ? network 구성안하고 알아서 onnx 에서 연산그래프 최적화 후 연산 진행 해주는데, input_tensor, output_tensor 전후처리는 직접해야한다.
     auto output_tensors = _session.Run(
         Ort::RunOptions{nullptr},
         input_name, &input_tensor, 1,

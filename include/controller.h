@@ -2,6 +2,9 @@
 #ifndef __CONTROLLER_H
 #define __CONTROLLER_H
 
+#include "observation.h"
+#include "policy.h" 
+
 // #include <iostream>
 #include <eigen3/Eigen/Dense>
 
@@ -21,6 +24,11 @@ public:
     CController();
     virtual ~CController();	
 
+    Observation _obs;
+    // ? unique_ptr 은 복사 불가능 -> 하나의 객체는 하나의 포인터만 가리킴
+    std::unique_ptr<Policy> _policy;
+    Eigen::VectorXd _last_action;
+
     void read(double time, double* q, double* qdot);
     void control_mujoco();
     void write(double* ctrl);
@@ -36,6 +44,18 @@ private:
     VectorXd _kp_diag, _kd_diag;
     void ModelUpdate();
     void motionPlan();
+    void setMujocoModel(mjModel* m, mjModel* d){
+        Model.set_mujoco_model(m,d);
+        _obs.setMujocoModel(m,d);
+    }
+    void loadPolicy(const std::string& onnx_path){
+        // ? Policy 객체 사이즈만큼 heap 영역 메모리 할당 -> onnx 를 생성자에 보내고 실제 객체 생성 -> unique_ptr 로 할당
+        _policy = std::make_unique<Policy>(onnx_path);
+        _last_action.setZero(31);
+    }
+    void setVelocityCommand(double vx, dobule vy, double wz){
+        _obs.setVelocityCommand(vx,vy,wz);
+    }
 
     void reset_target(double motion_time, VectorXd target_joint_position);
     void reset_target(double motion_time, VectorXd target_joint_position, VectorXd target_joint_velocity);

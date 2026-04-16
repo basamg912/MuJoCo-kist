@@ -82,7 +82,12 @@ void CController::write(double* ctrl)
 void CController::control_mujoco()
 {
     ModelUpdate(); // ! 동역학 계산
-	_q_des = _q_home;
+
+	Eigen::VectorXd stacked_obs = _obs.update(_q, _qdot, _q_home, _last_action);
+	Eigen::VectorXd action = _policy->inference(stacked_obs);
+	_last_action = action;
+
+	_q_des = _q_home + 0.25 *action;
 	_qdot_des.setZero();
 	// ! position 제어 시 pd 제어는 무조코가 진행
 	JointControl();
