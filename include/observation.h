@@ -38,11 +38,12 @@ private:
     );
 
     // ? 컴파일할때 값이 결정되어 종료될때까지 값을 유지 static: 모든 객체가 하나의 값을 공유, constexpr : 명시
-    static constexpr int SINGLE_DIM = 71;
+    static constexpr int SINGLE_DIM = 105;   // 3+3+3+31+31+31+3
     static constexpr int HISTORY_LEN = 5;
     static constexpr int LEG_DIM = 14;
+    static constexpr int JOINT_DIM = 31;
     static constexpr int NUM_BODIES = 32;
-    static constexpr int STACKED_DIM = 355;
+    static constexpr int STACKED_DIM = 525;  // 5 × 105
 
     std::deque<Eigen::VectorXd> _history;
     Eigen::Vector3d _vel_cmd;

@@ -15,18 +15,10 @@
 "* Authors: Sol Choi *"
 
 import isaaclab.sim as sim_utils
-from isaaclab.actuators import DelayedPDActuatorCfg, ImplicitActuatorCfg
+from isaaclab.actuators import DelayedPDActuatorCfg
 from isaaclab.assets.articulation import ArticulationCfg
-
-from pace_sim2real.utils.assetloader import LoadUrdfFileCfg
-from pace_sim2real.utils import PaceDCMotorCfg
-# LLJ1 : roll
-# LLJ2 : yaw
-# LLJ3 : pitch
-# LLJ4 : knee pitch
-# J5 : ankle pitch
-# J6 : ankle roll
-# J7 : toe pitch
+from kimic.utils.assetloader import LoadUrdfFileCfg
+from kimic.robots import KAPEX_EXT_DIR
 
 ARMATURE_RO80 = 0.084934656  # Hip Roll, Pitch & Ankle Pitch, Roll & Shoulder Pitch, Roll
 ARMATURE_RO100 = 0.2808152064  # Hip Pitch, Knee
@@ -60,10 +52,9 @@ DAMPING_WRIST_RP = 2.0 * DAMPING_RATIO * ARMATURE_WRIST_RP * NATURAL_FREQ  # 0.0
 DAMPING_AK7010 = 2.0 * DAMPING_RATIO * ARMATURE_AK7010 * NATURAL_FREQ      # 0.52024774342
 DAMPING_AK606 = 2.0 * DAMPING_RATIO * ARMATURE_AK606 * NATURAL_FREQ        # 0.110156804802
 
-
 KAPEX0_CFG = ArticulationCfg(
     spawn=LoadUrdfFileCfg(
-        asset_path="/home/kist/work/workspace/pace-humanoid/kapex0_description/KAPEX_wo_hand_head.urdf",
+        asset_path="/workspace/sy-mimic/kapex0-mimic/source/kimic/kimic/robots/kapex0_description/KAPEX_wo_hand_head.urdf",
         activate_contact_sensors=True,
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
             disable_gravity=False,
@@ -79,7 +70,7 @@ KAPEX0_CFG = ArticulationCfg(
         ),
     ),
     init_state=ArticulationCfg.InitialStateCfg(
-        pos=(0.0, 0.0, 1.3),
+        pos=(0.0, 0.0, 0.91),
         joint_pos={
             # ".*": 0.0,
 
@@ -98,8 +89,8 @@ KAPEX0_CFG = ArticulationCfg(
             "RAJ2": -0.2,
             "LAJ3": 0.18,
             "RAJ3": -0.18,
-            "LAJ4": -1.,  # 팔꿈치 og LAJ4 = -0.35 , RAJ4 = 0.35 [-1.658~0.175]
-            "RAJ4": 1.,
+            "LAJ4": -0.35,
+            "RAJ4": 0.35,
 
             ## HANDS (40)
             # ".*HJ_index2": 0.2,
@@ -119,62 +110,137 @@ KAPEX0_CFG = ArticulationCfg(
     ),
     soft_joint_pos_limit_factor=0.9,
     actuators={
-        "legs_hip": PaceDCMotorCfg(
-            joint_names_expr=["(L|R)LJ[1-2]"],
-            effort_limit=70,
-            velocity_limit=12,
-            stiffness=STIFFNESS_RO80,
-            damping=DAMPING_RO80,
-            armature=ARMATURE_RO80,
-            saturation_effort=90,
-            max_delay=10,
-            encoder_bias=[0.0] * 4,
+        "legs": DelayedPDActuatorCfg(
+            joint_names_expr=["(L|R)LJ[1-4]"],
+            effort_limit_sim={
+                "(L|R)LJ[1-2]": 70,
+                "(L|R)LJ[3-4]": 180,
+            },
+            velocity_limit_sim={
+                "(L|R)LJ[1-2]": 12,
+                "(L|R)LJ[3-4]": 12,
+            },
+            stiffness={
+                "(L|R)LJ[1-2]": STIFFNESS_RO80,
+                "(L|R)LJ[3-4]": STIFFNESS_RO100,
+            },
+            damping={
+                "(L|R)LJ[1-2]": DAMPING_RO80,
+                "(L|R)LJ[3-4]": 20,  # DAMPING_RO100,
+            },
+            armature={
+                "(L|R)LJ[1-2]": ARMATURE_RO80,
+                "(L|R)LJ[3-4]": ARMATURE_RO100,
+            },
+            min_delay=0,  # physics time steps (min: 2.0*0=0.0ms)
+            max_delay=1,  # physics time steps (max: 2.0*4=8.0ms)
         ),
-        "legs_knee": PaceDCMotorCfg(
-            joint_names_expr=["(L|R)LJ[3-4]"],
-            effort_limit=180,
-            velocity_limit=12,
-            stiffness=STIFFNESS_RO100,
-            damping=20,
-            armature=ARMATURE_RO100,
-            saturation_effort=220,
-            max_delay=10,
-            encoder_bias=[0.0] * 4,
+        "feet": DelayedPDActuatorCfg(
+            joint_names_expr=["(L|R)LJ[5-7]"],
+            effort_limit_sim={
+                "(L|R)LJ[5-6]": 60,
+                "(L|R)LJ7": 20,
+            },
+            velocity_limit_sim={
+                "(L|R)LJ[5-6]": 10,
+                "(L|R)LJ7": 5,
+            },
+            stiffness={
+                "(L|R)LJ[5-6]": 40,
+                "(L|R)LJ7": 5,
+            },
+            damping={
+                "(L|R)LJ[5-6]": 2,
+                "(L|R)LJ7": 0.05,
+            },
+            armature={
+                "(L|R)LJ[5-6]": 0.5 * ARMATURE_RO80,
+                "(L|R)LJ7": 3.0 * ARMATURE_RI60,
+            },
+            min_delay=0,  # physics time steps (min: 2.0*0=0.0ms)
+            max_delay=1,  # physics time steps (max: 2.0*4=8.0ms)
         ),
-        "ankle": PaceDCMotorCfg(
-            joint_names_expr=["(L|R)LJ[5-6]"],
-            effort_limit=60,
-            velocity_limit=10,
-            stiffness=40,
-            damping=2,
-            armature=0.5 * ARMATURE_RO80,
-            saturation_effort=150,
-            max_delay=10,
-            encoder_bias=[0.0] * 4,
+        "torso_roll": DelayedPDActuatorCfg(
+            joint_names_expr=["WLJ1"],
+            effort_limit_sim=100,
+            velocity_limit_sim=15,
+            stiffness=STIFFNESS_AK8064,
+            damping=DAMPING_AK8064,
+            armature=ARMATURE_AK8064,
+            min_delay=0,  # physics time steps (min: 2.0*0=0.0ms)
+            max_delay=1,  # physics time steps (max: 2.0*4=8.0ms)
         ),
-        "toe": PaceDCMotorCfg(
-            joint_names_expr=["(L|R)LJ7"],
-            effort_limit=20,
-            velocity_limit=5,
-            stiffness=5,
-            damping=0.05,
-            armature=3.0 * ARMATURE_RI60,
-            saturation_effort=30,
-            max_delay=10,
-            encoder_bias=[0.0] * 2,
+        "torso_yaw_pitch": DelayedPDActuatorCfg(
+            joint_names_expr=["WLJ[2-3]"],
+            effort_limit_sim=200,
+            velocity_limit_sim=15,
+            stiffness=2.0 * STIFFNESS_AK8064,
+            damping=2.0 * DAMPING_AK8064,
+            armature=2.0 * ARMATURE_AK8064,
+            min_delay=0,  # physics time steps (min: 2.0*0=0.0ms)
+            max_delay=1,  # physics time steps (max: 2.0*4=8.0ms)
         ),
-        # ! 내장 physx PD 제어기를 이용해 position 제어, action 에서 target 지정 X 필요
-        # ! init_state 에서 지정한 포지션을 유지
-        "torso": ImplicitActuatorCfg(
-            joint_names_expr=["WLJ[1-3]"],
-            stiffness=200.0,
-            damping=20.0,
-        ),
-        "arm": ImplicitActuatorCfg(
+        # "head": DelayedPDActuatorCfg(
+        #     joint_names_expr=[".*HLJ[1-2]"],
+        #     effort_limit_sim=75,
+        #     velocity_limit_sim=7,
+        #     stiffness={
+        #         "HLJ1": STIFFNESS_AK7010,
+        #         "HLJ2": STIFFNESS_AK606,
+        #     },
+        #     damping={
+        #         "HLJ1": DAMPING_AK7010,
+        #         "HLJ2": DAMPING_AK606,
+        #     },
+        #     armature={
+        #         "HLJ1": ARMATURE_AK7010,
+        #         "HLJ2": ARMATURE_AK606,
+        #     },
+        #     min_delay=0,  # physics time steps (min: 2.0*0=0.0ms)
+        #     max_delay=1,  # physics time steps (max: 2.0*4=8.0ms)
+        # ),
+        "arm": DelayedPDActuatorCfg(
             joint_names_expr=[".*AJ[1-7]"],
-            stiffness=50.0,
-            damping=5.0,
+            effort_limit_sim={
+                ".*AJ[1-2]": 70,
+                ".*AJ[3-4]": 30,
+                ".*AJ5": 20,
+                ".*AJ[6-7]": 10,
+            },
+            velocity_limit_sim={
+                ".*AJ.*": 7,
+            },
+            stiffness={
+                ".*AJ[1-2]": STIFFNESS_RO80,
+                ".*AJ[3-4]": STIFFNESS_AK1093,
+                ".*AJ5": STIFFNESS_AK709,
+                ".*AJ[6-7]": 5  # 2 * STIFFNESS_WRIST_RP,
+            },
+            damping={
+                ".*AJ[1-2]": DAMPING_RO80,
+                ".*AJ[3-4]": DAMPING_AK1093,
+                ".*AJ5": DAMPING_AK709,
+                ".*AJ[6-7]": 0.05  # 2 * DAMPING_WRIST_RP,
+            },
+            armature={
+                ".*AJ[1-2]": ARMATURE_RO80,
+                ".*AJ[3-4]": ARMATURE_AK1093,
+                ".*AJ5": ARMATURE_AK709,
+                ".*AJ[6-7]": 2 * ARMATURE_WRIST_RP,
+            },
+            min_delay=0,  # physics time steps (min: 2.0*0=0.0ms)
+            max_delay=1,  # physics time steps (max: 2.0*4=8.0ms)
         ),
+        # "hand": DelayedPDActuatorCfg(
+        #     joint_names_expr=[".*HJ_(thumb|index|middle|ring|little)[0-4]"],
+        #     effort_limit_sim=10,
+        #     velocity_limit_sim=2,
+        #     stiffness=10,
+        #     damping=0.1,
+        #     armature=0.001,
+        #     min_delay=0,  # physics time steps (min: 2.0*0=0.0ms)
+        #     max_delay=1,  # physics time steps (max: 2.0*4=8.0ms)
+        # ),
     },
 )
 """Configuration for the KAPEX_GEN2_WHOLEBODY_CFG robot."""

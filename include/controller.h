@@ -38,12 +38,7 @@ public:
     void control_mujoco();
     void write(double* ctrl);
     void set_default_pose(mjData* d);
-    void setModel(const mjModel* m, mjData* d){
-        Model.set_mujoco_model(m,d);
-        _obs.setMujocoModel(m,d);
-        _obs.reset();
-        _last_action.setZero(31);
-    }
+    void setModel(const mjModel* m, mjData* d);
     VectorXd _q, _qdot, _q_order, _qdot_order;
 
     void Initialize();
@@ -56,12 +51,8 @@ public:
         _policy = std::make_unique<Policy>(onnx_path);
         _last_action.setZero(31);
     }
-    void setVelocityCommand(double vx, double vy, double wz){
-        _obs.setVelocityCommand(vx,vy,wz);
-    }
-    void setComCommand(double dx, double dy, double dz){
-        _obs.setComCommand(dx,dy,dz);
-    }
+    void setVelocityCommand(double vx, double vy, double wz);
+    void setComCommand(double dx, double dy, double dz);
 
     void reset();
 private:
@@ -125,6 +116,13 @@ private:
     Matrix3d _R_des_hand;
 
     MatrixXd _I; // Identity matrix
+
+    int _wl3_body_id;
+    Eigen::Vector3d _wl3_default_com;
+    Eigen::Vector3d _wl3_com_offset;
+
+    void cacheWl3ComInfo();
+    void applyWl3ComOffset();
 };
 
 #endif

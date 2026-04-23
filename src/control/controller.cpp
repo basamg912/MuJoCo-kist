@@ -3,6 +3,9 @@
 CController::CController()
 {
 	_k = 31; // for kapex
+	_wl3_body_id = -1;
+	_wl3_default_com.setZero();
+	_wl3_com_offset.setZero();
 	Initialize();
 }
 
@@ -17,16 +20,80 @@ void CController::reset(){
 	_q_des = _q_home;
 	_last_policy_time = -1.0;
 }
+
+void CController::setModel(const mjModel* m, mjData* d)
+{
+	Model.set_mujoco_model(m, d);
+	_obs.setMujocoModel(m, d);
+	_obs.reset();
+	_last_action.setZero(31);
+	cacheWl3ComInfo();
+	applyWl3ComOffset();
+}
+
+void CController::setVelocityCommand(double vx, double vy, double wz)
+{
+	_obs.setVelocityCommand(vx, vy, wz);
+}
+
+void CController::setComCommand(double dx, double dy, double dz)
+{
+	_wl3_com_offset << dx, dy, dz;
+	_obs.setComCommand(dx, dy, dz);
+	applyWl3ComOffset();
+}
+
+void CController::cacheWl3ComInfo()
+{
+	const mjModel* mj_model = Model.getMjModel();
+	if (mj_model == nullptr)
+	{
+		_wl3_body_id = -1;
+		_wl3_default_com.setZero();
+		return;
+	}
+
+	_wl3_body_id = mj_name2id(mj_model, mjOBJ_BODY, "WL3");
+	if (_wl3_body_id < 0)
+	{
+		std::cout << "[WARN] WL3 body not found, COM command disabled" << '\n';
+		_wl3_default_com.setZero();
+		return;
+	}
+
+	for (int i = 0; i < 3; i++)
+	{
+		_wl3_default_com(i) = mj_model->body_ipos[3 * _wl3_body_id + i];
+	}
+}
+
+void CController::applyWl3ComOffset()
+{
+	mjModel* mj_model = const_cast<mjModel*>(Model.getMjModel());
+	if (mj_model == nullptr || _wl3_body_id < 0)
+	{
+		return;
+	}
+
+	for (int i = 0; i < 3; i++)
+	{
+		mj_model->body_ipos[3 * _wl3_body_id + i] = _wl3_default_com(i) + _wl3_com_offset(i);
+	}
+}
 // ! free joint 가상관절. pelvis 가 시뮬레이션 상에서 좌표가 고정되어있지않으니 freejoint 로 설정
 // ! 나머지 관절들은 좌표계가 부모 링크 기준이라서 고정
 void CController::set_default_pose(mjData* d){
 	int offset = Model.get_qpos_offset();
+	const mjModel* m = Model.getMjModel();
 
+	// freejoint(7개) 초기값을 XML의 body pos/quat (m->qpos0) 에서 가져옴
 	if (offset == 7){
-		d->qpos[0] = 0.0; d->qpos[1] = 0.0; d->qpos[2] = 1.03; d->qpos[3]=1.0; d->qpos[4]=0.0, d->qpos[5]=0.0; d->qpos[6]=0.0;
+		for (int i = 0; i < 7; i++){
+			d->qpos[i] = m->qpos0[i];
+		}
 	}
-	
-	for (int i= offset; i< Model.getMjModel()->nq; i++){
+
+	for (int i= offset; i< m->nq; i++){
 		d->qpos[i] = 0.0;
 	}
 
@@ -55,6 +122,7 @@ void CController::set_default_pose(mjData* d){
 	}
 }
 
+// ! main.cc 에서 읽은 MjData d 에서 q, qdot 을 읽어옴 (시뮬레이터에서)
 void CController::read(double t, double* q, double* qdot)
 {	
 	_t = t;
@@ -72,23 +140,17 @@ void CController::read(double t, double* q, double* qdot)
 	{
 		_q(i) = q[i+ Model.get_qpos_offset()]; // ! free joint 7개 xyz 쿼터니언4개
 		_qdot(i) = qdot[i+ Model.get_qvel_offset()]; // ! free joint 6개 xyz rpy
-		// _qdot(i) = CustomMath::VelLowpassFilter(0.001, 2.0*PI* 10.0, _pre_q(i), _q(i), _pre_qdot(i)); //low-pass filter
 		_pre_q(i) = _q(i);
 		_pre_qdot(i) = _qdot(i);		
-		if(_t < 2.0)///use filtered data after convergece
-        {
-			_qdot(i) = qdot[i+ Model.get_qvel_offset()];
-		}
 	}
 }
 
 void CController::write(double* ctrl)
 {
-	// position actuator: ctrl에 토크 대신 목표 위치를 전달
 	for (int i = 0; i < _k; i++)
 	{	
 		int mj_idx = isaac_joint_to_mujoco[i];
-			// ! qdot_des = 0 이면 - kd * _qdot
+			// ! qdot_des = 0 이면, - kd * _qdot
 		double qdot_clamped = std::max(-joint_vel_limit[mj_idx], std::min(joint_vel_limit[mj_idx], _qdot(mj_idx)));
 		double torque = _kp_scale * joint_kp[mj_idx] * (_q_des(mj_idx) - _q(mj_idx)) - _kd_scale * joint_kd[mj_idx] * qdot_clamped;
 		
@@ -116,11 +178,14 @@ void CController::control_mujoco()
 		for (int i=0; i< _k; i++){
 			action_mj(isaac_joint_to_mujoco[i]) = action(i);
 		}
+		// for (int i=14; i < _k; i++){
+		// 	action_mj(isaac_joint_to_mujoco[i]) = 0;
+		// }
 		_last_action = action;
 		_q_des = _q_home + 0.25 * action_mj;
 	} 
 	_qdot_des.setZero();
-	// ! position 제어 시 pd 제어는 무조코가 진행
+	// ! position 제어 시 pd 제어는 무조코가 진행, -> 현재는 수동 토크 계산
 	JointControl();
 
     // motionPlan(); // ! 목표 설정
@@ -272,8 +337,6 @@ void CController::JointControl()
 	// position actuator 사용: PD 계산은 MuJoCo가 처리
 	// _q_des는 control_mujoco()에서 trajectory로 업데이트됨
 	// write()에서 _q_des를 d->ctrl로 전달
-
-
 }
 
 // ! closed loop inverse kinematic
@@ -432,48 +495,4 @@ void CController::Initialize()
 	// cout.precision(3);
 	_cnt_plan = 0;
 	_bool_plan(_cnt_plan) = 1;
-
-	_kp_diag.setZero(_k);
-	_kd_diag.setZero(_k);
-	
-	// LL
-	_kp_diag(0) = 83.83;   _kd_diag(0) = 10.67;   // LLJ1
-	_kp_diag(1) = 83.83;   _kd_diag(1) = 10.67;   // LLJ2
-	_kp_diag(2) = 277.15;  _kd_diag(2) = 20.0;    // LLJ3
-	_kp_diag(3) = 277.15;  _kd_diag(3) = 20.0;    // LLJ4
-	_kp_diag(4) = 40.0;    _kd_diag(4) = 2.0;     // LLJ5
-	_kp_diag(5) = 40.0;    _kd_diag(5) = 2.0;     // LLJ6
-	_kp_diag(6) = 5.0;     _kd_diag(6) = 0.05;    // LLJ7
-
-	// RL (동일)
-	_kp_diag(7) = 83.83;   _kd_diag(7) = 10.67;
-	_kp_diag(8) = 83.83;   _kd_diag(8) = 10.67;
-	_kp_diag(9) = 277.15;  _kd_diag(9) = 20.0;
-	_kp_diag(10) = 277.15; _kd_diag(10) = 20.0;
-	_kp_diag(11) = 40.0;   _kd_diag(11) = 2.0;
-	_kp_diag(12) = 40.0;   _kd_diag(12) = 2.0;
-	_kp_diag(13) = 5.0;    _kd_diag(13) = 0.05;
-
-	// WL
-	_kp_diag(14) = 200.0;  _kd_diag(14) = 20.0;
-	_kp_diag(15) = 200.0;  _kd_diag(15) = 20.0;
-	_kp_diag(16) = 200.0;  _kd_diag(16) = 20.0;
-
-	// LA (왼팔) - 어깨 관절 더 강하게
-	_kp_diag(17) = 200.0;  _kd_diag(17) = 15.0;   // LAJ1 (어깨 yaw)
-	_kp_diag(18) = 200.0;  _kd_diag(18) = 15.0;   // LAJ2 (어깨 pitch)
-	_kp_diag(19) = 100.0;  _kd_diag(19) = 8.0;    // LAJ3
-	_kp_diag(20) = 100.0;  _kd_diag(20) = 8.0;    // LAJ4 (팔꿈치)
-	_kp_diag(21) = 50.0;   _kd_diag(21) = 5.0;
-	_kp_diag(22) = 50.0;   _kd_diag(22) = 5.0;
-	_kp_diag(23) = 30.0;   _kd_diag(23) = 3.0;
-
-	// RA - 동일
-	_kp_diag(24) = 200.0;  _kd_diag(24) = 15.0;
-	_kp_diag(25) = 200.0;  _kd_diag(25) = 15.0;
-	_kp_diag(26) = 100.0;  _kd_diag(26) = 8.0;
-	_kp_diag(27) = 100.0;  _kd_diag(27) = 8.0;
-	_kp_diag(28) = 50.0;   _kd_diag(28) = 5.0;
-	_kp_diag(29) = 50.0;   _kd_diag(29) = 5.0;
-	_kp_diag(30) = 30.0;   _kd_diag(30) = 3.0;
 }

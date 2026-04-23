@@ -364,14 +364,14 @@ void PhysicsLoop(mj::Simulate& sim) {
             Control.read(d->time, d->qpos, d->qvel);
             Control._kp_scale = d->ctrl[37] + 1.0;
             Control._kd_scale = d->ctrl[38] + 1.0;
+            Control.setVelocityCommand(d->ctrl[31], d->ctrl[32], d->ctrl[33]);
+            Control.setComCommand(d->ctrl[34], d->ctrl[35], d->ctrl[36]);
 
             static int step_count = 0;
             if (step_count % 4 == 0){ // ! isaaclab 제어주기 4step 당 한번 (0.005Hz, decimation=4 -> 0.02 -> 50Hz)
               Control.control_mujoco();
             }
             Control.write(d->ctrl);
-            Control.setVelocityCommand(d->ctrl[31], d->ctrl[32], d->ctrl[33]);
-            Control.setComCommand(d->ctrl[34], d->ctrl[35], d->ctrl[36]);
             step_count++;
           }
 

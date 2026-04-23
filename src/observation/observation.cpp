@@ -86,11 +86,18 @@ Eigen::VectorXd Observation::computeSingleObs(
     for (int i=0; i<3; i++) obs[idx++] = _vel_cmd[i];
 
     // ! 14개 다리에 대해서만 policy action 적용, 나머지는 포지션 제어
+    // // * 4) joint_pos_rel
+    // for (int i=0; i<LEG_DIM; i++)   obs[idx++]= q(isaac_leg_to_mujoco[i]) - q_home(isaac_leg_to_mujoco[i]);
+
+    // // * 5) joint_pos_rel
+    // for (int i=0; i<LEG_DIM; i++)   obs[idx++] = qdot(isaac_leg_to_mujoco[i]) * 0.05;
+
+    // ! 4/23 - 모든 조인트가 observation 으로 들어가도록
     // * 4) joint_pos_rel
-    for (int i=0; i<LEG_DIM; i++)   obs[idx++]= q(isaac_leg_to_mujoco[i]) - q_home(isaac_leg_to_mujoco[i]);
+    for (int i=0; i<JOINT_DIM; i++)   obs[idx++]= q(isaac_joint_to_mujoco[i]) - q_home(isaac_joint_to_mujoco[i]);
 
     // * 5) joint_pos_rel
-    for (int i=0; i<LEG_DIM; i++)   obs[idx++] = qdot(isaac_leg_to_mujoco[i]) * 0.05;
+    for (int i=0; i<JOINT_DIM; i++)   obs[idx++] = qdot(isaac_joint_to_mujoco[i]) * 0.05;
 
     // * 6) last_action
     for (int i=0; i<last_action.size(); i++)    obs[idx++] = last_action(i);
@@ -137,8 +144,9 @@ Eigen::VectorXd Observation::update(
     Eigen::VectorXd stacked(STACKED_DIM);
     int idx=0;
     // ! history stack
-    int term_starts[] = {0,3,6,9,23,37,68};
-    int term_size[] = {3,3,3,14,14,31,3}; // ! policy 수정하면 96 -> 3
+    // joint_pos_rel / joint_vel_rel 를 31로 확장한 버전
+    int term_starts[] = {0, 3, 6, 9, 40, 71, 102};
+    int term_size[]   = {3, 3, 3, 31, 31, 31, 3};
     int num_terms = 7;
 
     // for (int i=0; i<num_terms; i++){
@@ -149,7 +157,7 @@ Eigen::VectorXd Observation::update(
     // }
     // ! 역순 history
     for (int i=0; i<num_terms; i++){
-        for (int j=HISTORY_LEN-1; j>= 0 ; j--){
+        for (int j=0; j< HISTORY_LEN ; j++){
             stacked.segment(idx, term_size[i]) = _history[j].segment(term_starts[i], term_size[i]);
             idx += term_size[i];
         }
